@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Libretto</title>
+<meta name="description" content="Registro finanziario personale, offline sul telefono." />
+<meta name="theme-color" content="#4A6CF7" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="root"><div class="loading">Caricamento…</div></div>
+
+<div class="update-bar" id="update-bar" hidden>
+  <div class="inner">
+    <span>Nuova versione di Libretto pronta</span>
+    <button type="button" id="update-btn">Aggiorna</button>
+  </div>
+</div>
+
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="app.js"></script>
+<script>
+// chiede al browser di non cancellare i dati locali quando lo spazio scarseggia
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persisted().then(function (p) { if (!p) navigator.storage.persist(); }).catch(function () {});
+}
+// service worker: funziona offline e segnala quando c'è una versione nuova
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").then(function (reg) {
+      var bar = document.getElementById("update-bar");
+      var show = function (worker) {
+        bar.hidden = false;
+        document.getElementById("update-btn").onclick = function () { worker.postMessage("skipWaiting"); };
+      };
+      if (reg.waiting && navigator.serviceWorker.controller) show(reg.waiting);
+      reg.addEventListener("updatefound", function () {
+        var w = reg.installing;
+        if (!w) return;
+        w.addEventListener("statechange", function () {
+          if (w.state === "installed" && navigator.serviceWorker.controller) show(w);
+        });
+      });
+      // controlla aggiornamenti ogni volta che l'app torna in primo piano
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "visible") reg.update().catch(function () {});
+      });
+    }).catch(function () {});
+    var reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+  });
+}
+</script>
+</body>
+</html>
