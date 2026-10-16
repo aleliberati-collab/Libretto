@@ -1,6 +1,6 @@
 // Service worker di Libretto: tiene l'app disponibile offline.
 // VERSION viene sostituita da build.mjs a ogni build: cambia la cache e fa partire l'aggiornamento.
-const VERSION = "f96043d7dc12";
+const VERSION = "2b0d74d1e528";
 const CACHE = "libretto-" + VERSION;
 const SHELL = [
   "./",

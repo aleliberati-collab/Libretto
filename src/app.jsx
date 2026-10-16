@@ -565,15 +565,35 @@ function App() {
   const updateDeposit = (id, patch) => setState((s) => ({ ...s, deposits: s.deposits.map((d) => (d.id === id ? { ...d, ...patch } : d)) }));
   const deleteDeposit = (id) => setState((s) => ({ ...s, deposits: s.deposits.filter((d) => d.id !== id) }));
 
-  const exportData = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
+  // backup: su Android apre la condivisione (scegli Drive → cartella Claude/Libretto); altrove scarica il file.
+  // Chrome per Android non condivide file .json, quindi in quel caso il backup parte come .txt con lo stesso contenuto JSON.
+  const exportData = async () => {
+    const text = JSON.stringify(state, null, 2);
+    const base = `${todayISO()}_libretto`;
+    const done = () => setState((s) => ({ ...s, lastBackupDate: todayISO() }));
+    const candidates = [
+      new File([text], `${base}.json`, { type: "application/json" }),
+      new File([text], `${base}.txt`, { type: "text/plain" }),
+    ];
+    if (navigator.share && navigator.canShare) {
+      const file = candidates.find((f) => { try { return navigator.canShare({ files: [f] }); } catch (e) { return false; } });
+      if (file) {
+        try {
+          await navigator.share({ files: [file], title: "Backup Libretto" });
+          done();
+          return;
+        } catch (err) {
+          if (err && err.name === "AbortError") return; // condivisione annullata: nessun backup
+        }
+      }
+    }
+    const url = URL.createObjectURL(candidates[0]);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `libretto-backup-${todayISO()}.json`;
+    a.download = candidates[0].name;
     a.click();
-    URL.revokeObjectURL(url);
-    setState((s) => ({ ...s, lastBackupDate: todayISO() }));
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    done();
   };
 
   const importData = (e) => {
@@ -652,10 +672,10 @@ function App() {
           <Investments investments={state.investments} onUpdate={updateInvestment} onAdd={addInvestment} onDelete={deleteInvestment} />
         )}
         <div className="backup-row">
-          <button className="backup-btn" onClick={exportData}>⇩ Esporta backup (.json)</button>
+          <button className="backup-btn" onClick={exportData}>⇪ Salva backup su Drive</button>
           <label className="backup-btn" style={{cursor: "pointer"}}>
             ⇧ Importa backup
-            <input type="file" accept="application/json" style={{display: "none"}} onChange={importData} />
+            <input type="file" accept="application/json,.json,text/plain,.txt" style={{display: "none"}} onChange={importData} />
           </label>
         </div>
       </main>
@@ -689,10 +709,10 @@ function BackupReminder({ lastBackupDate, hasData, onExport }) {
     <div className="backup-reminder">
       <span>
         {lastBackupDate
-          ? `Ultimo backup ${daysSince} giorni fa. Consigliato esportarlo e salvarlo su Google Drive.`
-          : "Non hai ancora esportato un backup. Consigliato salvarne uno su Google Drive."}
+          ? `Ultimo backup ${daysSince} giorni fa. Salvane uno su Drive, cartella Claude/Libretto.`
+          : "Nessun backup ancora. Salvane uno su Drive, cartella Claude/Libretto."}
       </span>
-      <button onClick={onExport}>Esporta ora</button>
+      <button onClick={onExport}>Salva ora</button>
     </div>
   );
 }
