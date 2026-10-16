@@ -1,6 +1,6 @@
 // Service worker di Libretto: tiene l'app disponibile offline.
 // VERSION viene sostituita da build.mjs a ogni build: cambia la cache e fa partire l'aggiornamento.
-const VERSION = "2b0d74d1e528";
+const VERSION = "8d2394b85b1a";
 const CACHE = "libretto-" + VERSION;
 const SHELL = [
   "./",
@@ -8,6 +8,7 @@ const SHELL = [
   "style.css",
   "app.js",
   "manifest.webmanifest",
+  "fonts/manrope.woff2",
   "vendor/react.production.min.js",
   "vendor/react-dom.production.min.js",
   "icons/icon-192.png",

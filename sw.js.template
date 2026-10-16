@@ -8,6 +8,7 @@ const SHELL = [
   "style.css",
   "app.js",
   "manifest.webmanifest",
+  "fonts/manrope.woff2",
   "vendor/react.production.min.js",
   "vendor/react-dom.production.min.js",
   "icons/icon-192.png",

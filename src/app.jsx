@@ -86,6 +86,27 @@ const DEFAULT_RULES = [
   ["telia", "Abbonamento"], ["gym", "Abbonamento"], ["affitto", "Casa"], ["husleje", "Casa"],
 ].map(([match, category]) => ({ match, category }));
 
+// raggruppa i movimenti per giorno mantenendo l'ordine della lista
+function groupByDay(list) {
+  const out = [];
+  list.forEach((t) => {
+    const last = out[out.length - 1];
+    if (last && last[0] === t.date) last[1].push(t);
+    else out.push([t.date, [t]]);
+  });
+  return out;
+}
+function dayLabel(iso) {
+  const today = new Date().toISOString().slice(0, 10);
+  const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (iso === today) return "Oggi";
+  if (iso === y) return "Ieri";
+  const d = new Date(iso + "T12:00:00");
+  if (isNaN(d)) return iso;
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) });
+}
+const fmtSigned = (n) => (Math.round(n) === 0 ? "0" : (n > 0 ? "+" : "−") + new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 }).format(Math.abs(Math.round(n))));
 const fmt = (n) => new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 }).format(Math.round(n || 0));
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -446,6 +467,9 @@ const IconChart = (p) => <Icon {...p} path={<><path d="M3 3v18h18"/><path d="M7 
 const IconX = (p) => <Icon {...p} path={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>} />;
 const IconTarget = (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>} />;
 const IconSwap = (p) => <Icon {...p} path={<><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></>} />;
+const IconList = (p) => <Icon {...p} path={<><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></>} />;
+const IconPie = (p) => <Icon {...p} path={<><path d="M21 15.5A9.5 9.5 0 1 1 8.5 3"/><path d="M12 2.5A9.5 9.5 0 0 1 21.5 12H12Z"/></>} />;
+const IconCalendar = (p) => <Icon {...p} path={<><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></>} />;
 const IconUpload = (p) => <Icon {...p} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>} />;
 
 // ---------- app ----------
@@ -617,14 +641,17 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Header />
-      <nav className="tabs">
-        {[["panoramica", "Panoramica"], ["piano", "Piano mensile"], ["conti", "Conti"], ["movimenti", "Movimenti"], ["categorie", "Categorie"], ["investimenti", "Investimenti"]].map(([key, label]) => (
-          <button key={key} className={"tab" + (tab === key ? " active" : "")} onClick={() => setTab(key)}>{label}</button>
+      <Header title={(NAV.find((n) => n[0] === tab) || NAV[0])[2]} />
+      <nav className="tabbar" aria-label="Sezioni">
+        {NAV.map(([key, label, , NavIcon]) => (
+          <button key={key} className={"tabbar-btn" + (tab === key ? " active" : "")} aria-current={tab === key ? "page" : undefined} onClick={() => { setTab(key); window.scrollTo(0, 0); }}>
+            <NavIcon size={22} />
+            <span>{label}</span>
+          </button>
         ))}
       </nav>
       <main className="content">
-        <BackupReminder lastBackupDate={state.lastBackupDate} hasData={state.transactions.length > 0} onExport={exportData} />
+        {tab === "panoramica" && <BackupReminder lastBackupDate={state.lastBackupDate} hasData={state.transactions.length > 0} onExport={exportData} />}
         {tab === "panoramica" && <Overview state={state} />}
         {tab === "piano" && (
           <MonthlyPlan state={state} accountNames={names} onUpdateSettings={updateSettings} onRegister={(txs) => addTransactions(txs, true)} />
@@ -672,9 +699,9 @@ function App() {
           <Investments investments={state.investments} onUpdate={updateInvestment} onAdd={addInvestment} onDelete={deleteInvestment} />
         )}
         <div className="backup-row">
-          <button className="backup-btn" onClick={exportData}>⇪ Salva backup su Drive</button>
+          <button className="backup-btn" onClick={exportData}>⇪ Backup su Drive</button>
           <label className="backup-btn" style={{cursor: "pointer"}}>
-            ⇧ Importa backup
+            ⇩ Importa backup
             <input type="file" accept="application/json,.json,text/plain,.txt" style={{display: "none"}} onChange={importData} />
           </label>
         </div>
@@ -717,15 +744,23 @@ function BackupReminder({ lastBackupDate, hasData, onExport }) {
   );
 }
 
-function Header() {
+// sezioni: [chiave, etichetta breve per la barra, titolo della pagina, icona]
+const NAV = [
+  ["panoramica", "Home", "Panoramica", IconHome],
+  ["movimenti", "Movimenti", "Movimenti", IconList],
+  ["categorie", "Analisi", "Spese per categoria", IconPie],
+  ["investimenti", "Portafoglio", "Investimenti", IconTrend],
+  ["conti", "Conti", "Conti e depositi", IconLandmark],
+  ["piano", "Piano", "Piano mensile", IconCalendar],
+];
+
+function Header({ title }) {
+  const today = new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
   return (
     <header className="header">
       <div className="header-inner">
-        <div className="stamp">L</div>
-        <div>
-          <div className="header-title">Libretto</div>
-          <div className="header-sub">Registro finanziario personale</div>
-        </div>
+        <div className="header-meta"><span className="stamp">L</span>Libretto · {today}</div>
+        <h1 className="header-title">{title}</h1>
       </div>
     </header>
   );
@@ -1200,17 +1235,17 @@ function NetWorthChart({ history }) {
       >
         <defs>
           <linearGradient id="nwFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#12213A" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#12213A" stopOpacity="0" />
+            <stop offset="0%" className="nw-stop" stopOpacity="0.28" />
+            <stop offset="100%" className="nw-stop" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path d={areaPath} fill="url(#nwFill)" />
-        <path d={linePath} fill="none" stroke="#12213A" strokeWidth="2" />
-        {hp && <line x1={hx} y1="0" x2={hx} y2={H} stroke="#C7752F" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />}
-        {hp && <circle cx={hx} cy={yAt(hp.value)} r="4" fill="#C7752F" />}
+        <path d={linePath} className="nw-line" fill="none" strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" />
+        {hp && <line x1={hx} y1="0" x2={hx} y2={H} className="nw-cursor" strokeWidth="1" strokeDasharray="3 3" />}
+        {hp && <circle cx={hx} cy={yAt(hp.value)} r="4.5" className="nw-dot" />}
       </svg>
       {hp && (
-        <div className="chart-tooltip" style={{ left: `${(hx / W) * 100}%`, top: 0 }}>
+        <div className="chart-tooltip" style={{ left: `${Math.min(80, Math.max(20, (hx / W) * 100))}%`, top: 0 }}>
           {hp.date}: {fmt(hp.value)} DKK
         </div>
       )}
@@ -1506,19 +1541,32 @@ function Movements({ state, transactions, accountNames, categoriesOut, categorie
 
       <div className="tx-list">
         {filtered.length === 0 && <div className="empty-note">Nessun movimento registrato.</div>}
-        {filtered.map((t) => (
-          <div className="tx-row clickable" key={t.id} onClick={() => setSelectedId(t.id)}>
-            <div className="tx-date">{t.date}</div>
-            <div className="tx-account">{t.type === "transfer" ? `${t.account} → ${t.toAccount}` : t.account}</div>
-            <div className="tx-cat"><span className="cat-dot" style={{ background: catColor(t.category) }} />{t.category}</div>
-            <div className="tx-note">{t.note}</div>
-            <div className={"tx-amount " + t.type}>{t.type === "in" ? "+" : t.type === "out" ? "−" : "⇄ "}{fmt(t.amount)}</div>
-            <button
-              className="tx-delete"
-              onClick={(e) => { e.stopPropagation(); onDelete(t.id); }}
-              aria-label="Elimina"
-            ><IconTrash size={14} /></button>
-          </div>
+        {groupByDay(filtered).map(([day, items]) => (
+          <section className="tx-day" key={day}>
+            <div className="tx-day-head">
+              <span>{dayLabel(day)}</span>
+              <span className="tx-day-sum">{fmtSigned(items.reduce((a, t) => a + (t.type === "in" ? t.amount : t.type === "out" ? -t.amount : 0), 0))}</span>
+            </div>
+            {items.map((t) => (
+              <div className="tx-row clickable" key={t.id} onClick={() => setSelectedId(t.id)}>
+                <span className="tx-icon" style={{ "--cat": t.type === "transfer" ? "var(--muted)" : catColor(t.category) }} aria-hidden="true">
+                  {t.type === "transfer" ? "⇄" : (t.category || "?").slice(0, 1).toUpperCase()}
+                </span>
+                <div className="tx-main">
+                  <div className="tx-title">{t.note || t.category}</div>
+                  <div className="tx-sub">
+                    {t.note ? `${t.category} · ` : ""}{t.type === "transfer" ? `${t.account} → ${t.toAccount}` : t.account}
+                  </div>
+                </div>
+                <div className={"tx-amount " + t.type}>{t.type === "in" ? "+" : t.type === "out" ? "−" : ""}{fmt(t.amount)}</div>
+                <button
+                  className="tx-delete"
+                  onClick={(e) => { e.stopPropagation(); onDelete(t.id); }}
+                  aria-label="Elimina"
+                ><IconTrash size={15} /></button>
+              </div>
+            ))}
+          </section>
         ))}
       </div>
 
