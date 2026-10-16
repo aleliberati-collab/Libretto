@@ -1419,6 +1419,8 @@ function Accounts({ accounts, deposits, onToggleAccountShared, onToggleSubShared
             </div>
           </div>
         ))}
+        <details className="add-more">
+          <summary><IconPlus size={16} /> Nuovo conto deposito</summary>
         <form className="tx-form" onSubmit={submitDeposit}>
           <div className="tx-form-row">
             <input type="text" placeholder="Nome (es. Deposito 6 mesi)" value={newDeposit.name} onChange={(e) => setNewDeposit((s) => ({ ...s, name: e.target.value }))} />
@@ -1427,6 +1429,7 @@ function Accounts({ accounts, deposits, onToggleAccountShared, onToggleSubShared
           </div>
           <button type="submit" className="btn-add"><IconPlus size={16} /> Aggiungi conto deposito</button>
         </form>
+        </details>
       </div>
     </div>
   );
@@ -1479,6 +1482,8 @@ function Movements({ state, transactions, accountNames, categoriesOut, categorie
     <div className="movements">
       <button className="btn-import" onClick={() => setImportOpen(true)}><IconUpload size={16} /> Importa estratto conto (CSV)</button>
 
+      <details className="add-more">
+        <summary><IconPlus size={16} /> Nuovo movimento con data e nota</summary>
       <form className="tx-form" onSubmit={submit}>
         <div className="tx-form-row">
           <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value, category: e.target.value === "in" ? categoriesIn[0] : categoriesOut[0] }))}>
@@ -1506,6 +1511,7 @@ function Movements({ state, transactions, accountNames, categoriesOut, categorie
         </div>
         <button type="submit" className="btn-add"><IconPlus size={16} /> Aggiungi movimento</button>
       </form>
+      </details>
 
       <div className="filter-row">
         <span className="filter-label">Conto:</span>
@@ -2144,21 +2150,48 @@ function Investments({ investments, onUpdate, onAdd, onDelete }) {
         <div className="eyebrow">Totale investito</div>
         <div className="goal-value">{fmt(total)} <span className="unit">DKK</span></div>
         <div className="goal-breakdown">di cui Fondo Casa (Saxo + Revolut ETF): {fmt(goalInv)} DKK</div>
-      </div>
-      {grouped.map((g) => (
-        <div className="panel" key={g.key}>
-          <div className="panel-title">{g.label}{GOAL_BUCKETS.includes(g.key) ? " 🏠" : ""}</div>
-          {g.items.length === 0 && <div className="empty-note">Nessuna voce in questo bucket.</div>}
-          {g.items.map((i) => (
-            <div className="invest-row" key={i.id}>
-              <span className="invest-label">{i.label}</span>
-              <input type="number" className="invest-input" value={i.value} onChange={(e) => onUpdate(i.id, parseFloat(e.target.value) || 0)} />
-              <span className="invest-unit">DKK</span>
-              <button className="tx-delete" onClick={() => onDelete(i.id)} aria-label="Elimina"><IconTrash size={14} /></button>
+        {total > 0 && (
+          <>
+            <div className="alloc-bar" role="img" aria-label="Ripartizione degli investimenti">
+              {grouped.filter((g) => g.items.length).map((g) => {
+                const v = g.items.reduce((x, i) => x + (i.value || 0), 0);
+                return v > 0 ? <span key={g.key} style={{ width: `${(v / total) * 100}%`, background: `var(--b-${g.key})` }} /> : null;
+              })}
             </div>
-          ))}
-        </div>
-      ))}
+            <div className="alloc-legend">
+              {grouped.map((g) => {
+                const v = g.items.reduce((x, i) => x + (i.value || 0), 0);
+                return v > 0 ? <span key={g.key}><i style={{ background: `var(--b-${g.key})` }} />{g.label.replace(/ \(.*\)$/, "")} {Math.round((v / total) * 100)}%</span> : null;
+              })}
+            </div>
+          </>
+        )}
+      </div>
+      <div className="panel invest-list">
+        {grouped.map((g) => {
+          const sub = g.items.reduce((x, i) => x + (i.value || 0), 0);
+          return (
+            <div className="invest-group" key={g.key}>
+              <div className="invest-group-head">
+                <span className="alloc-dot" style={{ background: `var(--b-${g.key})` }} />
+                <span className="invest-group-name">{g.label}{GOAL_BUCKETS.includes(g.key) ? " 🏠" : ""}</span>
+                <span className="invest-group-sub">{fmt(sub)}</span>
+              </div>
+              {g.items.length === 0 && <div className="empty-note">Nessuna voce.</div>}
+              {g.items.map((i) => (
+                <div className="invest-row" key={i.id}>
+                  <span className="invest-label">{i.label}</span>
+                  <input type="number" inputMode="decimal" className="invest-input" aria-label={`Valore ${i.label}`} value={i.value} onChange={(e) => onUpdate(i.id, parseFloat(e.target.value) || 0)} />
+                  <span className="invest-unit">DKK</span>
+                  <button className="tx-delete" onClick={() => onDelete(i.id)} aria-label="Elimina"><IconTrash size={14} /></button>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <details className="add-more">
+        <summary><IconPlus size={16} /> Aggiungi posizione</summary>
       <form className="tx-form" onSubmit={submit}>
         <div className="tx-form-row">
           <input type="text" placeholder="Nome posizione (es. VWCE)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
@@ -2169,6 +2202,7 @@ function Investments({ investments, onUpdate, onAdd, onDelete }) {
         </div>
         <button type="submit" className="btn-add"><IconPlus size={16} /> Aggiungi posizione</button>
       </form>
+      </details>
     </div>
   );
 }

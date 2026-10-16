@@ -436,3 +436,51 @@ input, select, textarea { font-size: 15px; } /* 15px+ evita lo zoom automatico s
 /* campi numerici senza frecce */
 input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input[type=number] { -moz-appearance: textfield; }
+
+/* ===== rifinitura v2 ===== */
+:root { --b-saxo: #2F5BEA; --b-revolut_pac: #0E9F8E; --b-satellite: #C2410C; --b-company_stock: #7C3AED; --b-crypto: #CA8A04; }
+@media (prefers-color-scheme: dark) { :root { --b-saxo: #7090FF; --b-revolut_pac: #2DD4BF; --b-satellite: #FB923C; --b-company_stock: #A78BFA; --b-crypto: #FACC15; } }
+
+/* i due riquadri affiancati vanno in colonna sul telefono */
+@media (max-width: 560px) { .grid-2 { grid-template-columns: 1fr; } }
+.grid-2 > * { min-width: 0; }
+
+/* indicatori: piastrelle pulite al posto delle icone */
+.kpi-grid { gap: 8px; }
+.kpi-cell { background: var(--surface-2); border-radius: var(--r-md); padding: 12px; }
+.kpi-icon-wrap { display: none; }
+.kpi-value { font-size: 21px; }
+/* riquadri dentro un pannello: senza bordo e ombra */
+.panel .stat-card { background: var(--surface-2); border: 0; box-shadow: none; }
+
+/* valori modificabili che sembrano testo finché non li tocchi */
+.invest-input, .balance-input, .deposit-field input {
+  background: transparent; border: 1px solid transparent; border-bottom: 1px dashed var(--line);
+  border-radius: 8px 8px 0 0; font-variant-numeric: tabular-nums;
+}
+.invest-input:focus, .balance-input:focus, .deposit-field input:focus { background: var(--surface-2); border-color: var(--accent); border-radius: 8px; outline: none; }
+.balance-input.main { background: transparent; border-color: transparent; border-bottom-color: color-mix(in srgb, var(--accent) 50%, transparent); font-size: 16px; }
+
+/* investimenti: un solo elenco, barra di allocazione nella carta */
+.alloc-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; margin-top: 16px; background: var(--hero-track); gap: 2px; }
+.alloc-bar span { display: block; height: 100%; }
+.alloc-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--hero-muted); }
+.alloc-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+.invest-list { padding-top: 6px; padding-bottom: 6px; }
+.invest-group + .invest-group { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
+.invest-group-head { display: flex; align-items: center; gap: 8px; padding: 10px 0 2px; }
+.invest-group-name { flex: 1; min-width: 0; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.invest-group-sub { font-size: 13px; font-weight: 800; color: var(--muted); }
+.alloc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.invest-list .invest-row { border-bottom: 0; padding: 4px 0; }
+.invest-list .empty-note { padding: 2px 0 8px; }
+
+/* moduli di aggiunta richiudibili */
+.add-more { margin-bottom: 12px; }
+.add-more > summary {
+  list-style: none; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+  padding: 12px; border-radius: 14px; border: 1px dashed var(--line); color: var(--fg-2); font-weight: 800; font-size: 14px;
+}
+.add-more > summary::-webkit-details-marker { display: none; }
+.add-more[open] > summary { margin-bottom: 10px; color: var(--muted); }
+.add-more .tx-form { margin-bottom: 0; }
