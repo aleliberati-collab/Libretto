@@ -54,8 +54,10 @@ if ("serviceWorker" in navigator) {
       });
     }).catch(function () {});
     var reloaded = false;
+    // al primo avvio il service worker prende il controllo senza ricaricare: si ricarica solo dopo un aggiornamento
+    var hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener("controllerchange", function () {
-      if (reloaded) return;
+      if (reloaded || !hadController) return;
       reloaded = true;
       location.reload();
     });

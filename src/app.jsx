@@ -1054,12 +1054,13 @@ function GoalSettings({ settings, onUpdateSettings }) {
 }
 
 // ---------- piano mensile: PAC %, Extra %, trading, sweep oltre il buffer, ripartizione Saxo/Revolut ----------
+// tre passi: cosa è arrivato, come si divide, cosa fare. Le impostazioni stanno in una scheda a parte.
 function MonthlyPlan({ state, accountNames, onUpdateSettings, onRegister }) {
   const st = state.settings;
   const lastSalary = state.transactions.find((t) => t.type === "in" && t.category === "Stipendio");
   const [salary, setSalary] = useState(lastSalary ? String(lastSalary.amount) : "");
   const [mainBal, setMainBal] = useState(String(Math.round(getBalance(state.accounts, st.mainAccount) * 100) / 100));
-  const [showSettings, setShowSettings] = useState(false);
+  const [view, setView] = useState("plan");
   const [done, setDone] = useState(false);
 
   const net = parseFloat(String(salary).replace(",", ".")) || 0;
@@ -1067,7 +1068,7 @@ function MonthlyPlan({ state, accountNames, onUpdateSettings, onRegister }) {
   const pac = (net * st.pacPct) / 100;
   const extra = (net * st.extraPct) / 100;
   const trading = net > 0 ? st.trading : 0;
-  const sweep = Math.max(0, bal - pac - extra - trading - st.buffer);
+  const sweep = net > 0 ? Math.max(0, bal - pac - extra - trading - st.buffer) : 0;
   const toInvest = pac + sweep;
   const saxo = (toInvest * st.saxoPct) / 100;
   const revolut = toInvest - saxo;
@@ -1091,80 +1092,113 @@ function MonthlyPlan({ state, accountNames, onUpdateSettings, onRegister }) {
 
   const num = (key) => (e) => onUpdateSettings({ [key]: parseFloat(e.target.value) || 0 });
   const acc = (key) => (e) => onUpdateSettings({ [key]: e.target.value });
+  // "Lunar · Trading" → "Trading": nei passaggi basta il nome del sottoconto
+  const short = (name) => (name.includes(" · ") ? name.split(" · ").pop() : name);
+
+  // come si divide il saldo del giorno di paga
+  const slices = [
+    { key: "pac", label: "PAC", note: `${st.pacPct}% del netto`, value: pac, color: "#0E9F8E" },
+    { key: "extra", label: "Extra (viaggi)", note: `${st.extraPct}% del netto`, value: extra, color: "#4A6FA5" },
+    { key: "trading", label: "Trading", note: "accantonamento fisso del mese", value: trading, color: "#7C3AED" },
+    { key: "sweep", label: "Sweep", note: `quello che supera il buffer di ${fmt(st.buffer)} DKK`, value: sweep, color: "#C2410C" },
+    { key: "left", label: "Resta sul conto", note: "per le spese del mese", value: Math.max(0, leftover), color: "#9AA2B0" },
+  ].filter((sl) => sl.key !== "trading" || trading > 0);
+  const barTotal = slices.reduce((x, sl) => x + sl.value, 0);
+
+  // i passaggi da fare, in ordine
+  const steps = [];
+  if (extra > 0.004) steps.push({ amount: extra, verb: "Sposta", from: st.mainAccount, to: st.extraAccount });
+  if (trading > 0.004) steps.push({ amount: trading, verb: "Sposta", from: st.mainAccount, to: st.tradingAccount });
+  if (toInvest > 0.004) steps.push({ amount: toInvest, verb: "Sposta", from: st.mainAccount, to: st.investAccount, why: sweep > 0.004 ? "PAC + sweep" : "" });
+  if (saxo > 0.004) steps.push({ amount: saxo, verb: "Investi", from: st.investAccount, to: "Saxo", why: `${st.saxoPct}%` });
+  if (revolut > 0.004) steps.push({ amount: revolut, verb: "Investi", from: st.investAccount, to: "Revolut", why: `${100 - st.saxoPct}% · ≈ ${fmt(revolut / st.eurDkk)} EUR` });
 
   return (
     <div className="plan">
-      <div className="panel">
-        <div className="panel-title"><IconSwap size={16} /> Piano del 25 del mese</div>
-        <div className="detail-field-row">
-          <label>Netto in busta</label>
-          <input type="number" inputMode="decimal" value={salary} onChange={(e) => { setSalary(e.target.value); setDone(false); }} placeholder="0" />
-        </div>
-        <div className="detail-field-row">
-          <label>Saldo {st.mainAccount}</label>
-          <input type="number" inputMode="decimal" value={mainBal} onChange={(e) => { setMainBal(e.target.value); setDone(false); }} />
-        </div>
-        <div className="kpi-note">Saldo dopo l'accredito dello stipendio. Precompilato con il saldo attuale in Libretto.</div>
-
-        <div className="plan-table">
-          <PlanRow label={`PAC ${st.pacPct}%`} value={pac} to={st.investAccount} />
-          <PlanRow label={`Extra ${st.extraPct}% (viaggi)`} value={extra} to={st.extraAccount} />
-          <PlanRow label="Trading" value={trading} to={st.tradingAccount} />
-          <PlanRow label={`Sweep oltre ${fmt(st.buffer)}`} value={sweep} to={st.investAccount} />
-          <div className="plan-sep" />
-          <PlanRow label="Da investire" value={toInvest} strong />
-          <PlanRow label={`Saxo ${st.saxoPct}%`} value={saxo} to="Saxo (broker)" />
-          <PlanRow label={`Revolut ${100 - st.saxoPct}%`} value={revolut} to="Revolut (broker)" sub={`≈ ${fmt(revolut / st.eurDkk)} EUR`} />
-          <div className="plan-sep" />
-          <PlanRow label={`Resta su ${st.mainAccount}`} value={leftover} strong />
-        </div>
-
-        {shortfall && net > 0 && (
-          <div className="alert-card warn">Dopo PAC, Extra e trading il conto scende sotto il buffer di {fmt(st.buffer)} DKK: nessuno sweep questo mese.</div>
-        )}
-
-        <button className="btn-add" disabled={net <= 0 || done} onClick={register}>
-          <IconSwap size={16} /> {done ? "Trasferimenti registrati" : "Registra i trasferimenti"}
-        </button>
-        <div className="kpi-note" style={{ marginTop: 8 }}>
-          Crea i trasferimenti in Movimenti e aggiorna i saldi. I versamenti verso Saxo e Revolut aumentano subito il valore dei rispettivi investimenti; dopo l'acquisto sostituiscilo con il valore reale dal broker.
-        </div>
+      <div className="quick-add-typerow plan-switch">
+        <button className={"quick-add-typebtn transfer" + (view === "plan" ? " active" : "")} onClick={() => setView("plan")}>Piano del 25</button>
+        <button className={"quick-add-typebtn transfer" + (view === "settings" ? " active" : "")} onClick={() => setView("settings")}>Impostazioni</button>
       </div>
 
-      <div className="panel">
-        <button className="manage-cat-link" onClick={() => setShowSettings((v) => !v)}>{showSettings ? "Nascondi impostazioni" : "Impostazioni del piano"}</button>
-        {showSettings && (
-          <div>
-            <GoalSettings settings={st} onUpdateSettings={onUpdateSettings} />
-            <div className="detail-field-row"><label>PAC % del netto</label><input type="number" value={st.pacPct} onChange={num("pacPct")} /></div>
-            <div className="detail-field-row"><label>Extra % del netto</label><input type="number" value={st.extraPct} onChange={num("extraPct")} /></div>
-            <div className="detail-field-row"><label>Trading DKK/mese</label><input type="number" value={st.trading} onChange={num("trading")} /></div>
-            <div className="detail-field-row"><label>Buffer conto</label><input type="number" value={st.buffer} onChange={num("buffer")} /></div>
-            <div className="detail-field-row"><label>Quota Saxo %</label><input type="number" value={st.saxoPct} onChange={num("saxoPct")} /></div>
-            <div className="detail-field-row"><label>Cambio EUR/DKK</label><input type="number" step="0.01" value={st.eurDkk} onChange={num("eurDkk")} /></div>
-            {[["mainAccount", "Conto stipendio"], ["investAccount", "Conto investimenti"], ["extraAccount", "Conto Extra"], ["tradingAccount", "Conto trading"]].map(([k, l]) => (
-              <div className="detail-field-row" key={k}>
-                <label>{l}</label>
-                <select value={st[k]} onChange={acc(k)}>
-                  {(accountNames.includes(st[k]) ? accountNames : [st[k], ...accountNames]).map((a) => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </div>
-            ))}
+      {view === "plan" && (
+        <>
+          <div className="panel">
+            <div className="step-head"><span className="step-n">1</span>Cosa è arrivato</div>
+            <label className="plan-field">
+              <span>Netto in busta di questo mese</span>
+              <input type="number" inputMode="decimal" value={salary} onChange={(e) => { setSalary(e.target.value); setDone(false); }} placeholder="0" />
+            </label>
+            <label className="plan-field">
+              <span>Saldo di {st.mainAccount} adesso</span>
+              <input type="number" inputMode="decimal" value={mainBal} onChange={(e) => { setMainBal(e.target.value); setDone(false); }} />
+            </label>
+            <div className="kpi-note">Il saldo dopo l'accredito dello stipendio. È già compilato con quello registrato in Libretto.</div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
-function PlanRow({ label, value, to, strong, sub }) {
-  return (
-    <div className={"plan-row" + (strong ? " strong" : "")}>
-      <div>
-        <div className="plan-label">{label}</div>
-        {(to || sub) && <div className="plan-to">{to ? `→ ${to}` : ""}{to && sub ? " · " : ""}{sub || ""}</div>}
-      </div>
-      <div className="plan-val">{fmt(value)} DKK</div>
+          {net > 0 && (
+            <div className="panel">
+              <div className="step-head"><span className="step-n">2</span>Come si divide</div>
+              {barTotal > 0 && (
+                <div className="plan-bar" role="img" aria-label="Divisione del saldo">
+                  {slices.map((sl) => sl.value > 0 ? <span key={sl.key} style={{ width: `${(sl.value / barTotal) * 100}%`, background: sl.color }} /> : null)}
+                </div>
+              )}
+              {slices.map((sl) => (
+                <div className="plan-slice" key={sl.key}>
+                  <span className="cat-dot" style={{ background: sl.color }} />
+                  <div className="plan-slice-text">
+                    <div className="plan-slice-label">{sl.label}</div>
+                    <div className="plan-slice-note">{sl.note}</div>
+                  </div>
+                  <div className="plan-slice-val">{fmt(sl.value)} <span className="unit-sm">DKK</span></div>
+                </div>
+              ))}
+              {shortfall && (
+                <div className="alert-card warn" style={{ marginTop: 10 }}>Dopo PAC, Extra e trading sul conto restano meno di {fmt(st.buffer)} DKK: questo mese niente sweep.</div>
+              )}
+            </div>
+          )}
+
+          {net > 0 && (
+            <div className="panel">
+              <div className="step-head"><span className="step-n">3</span>Cosa fare</div>
+              {steps.map((x, i) => (
+                <div className="plan-step" key={i}>
+                  <div className="plan-step-n">{i + 1}</div>
+                  <div className="plan-step-text">
+                    <div className="plan-step-main">{x.verb} <strong>{fmt(x.amount)} DKK</strong>{x.verb === "Investi" ? ` su ${x.to}` : ""}</div>
+                    <div className="plan-step-sub">{x.verb === "Investi" ? `dal conto ${short(x.from)}` : `da ${short(x.from)} a ${short(x.to)}`}{x.why ? ` · ${x.why}` : ""}</div>
+                  </div>
+                </div>
+              ))}
+              <button className="btn-add" style={{ marginTop: 12 }} disabled={steps.length === 0 || done} onClick={register}>
+                <IconSwap size={16} /> {done ? "Fatto: trasferimenti registrati" : "Fatto: registra i trasferimenti"}
+              </button>
+              <div className="kpi-note" style={{ marginTop: 8 }}>Dopo aver fatto i passaggi in banca, tocca il pulsante: Libretto li registra in Movimenti e aggiorna i saldi. I versamenti verso Saxo e Revolut aumentano subito il valore degli investimenti; dopo l'acquisto sostituiscilo con il valore reale dal broker.</div>
+            </div>
+          )}
+        </>
+      )}
+
+      {view === "settings" && (
+        <div className="panel">
+          <GoalSettings settings={st} onUpdateSettings={onUpdateSettings} />
+          <div className="detail-field-row"><label>PAC % del netto</label><input type="number" value={st.pacPct} onChange={num("pacPct")} /></div>
+          <div className="detail-field-row"><label>Extra % del netto</label><input type="number" value={st.extraPct} onChange={num("extraPct")} /></div>
+          <div className="detail-field-row"><label>Trading DKK/mese</label><input type="number" value={st.trading} onChange={num("trading")} /></div>
+          <div className="detail-field-row"><label>Buffer conto</label><input type="number" value={st.buffer} onChange={num("buffer")} /></div>
+          <div className="detail-field-row"><label>Quota Saxo %</label><input type="number" value={st.saxoPct} onChange={num("saxoPct")} /></div>
+          <div className="detail-field-row"><label>Cambio EUR/DKK</label><input type="number" step="0.01" value={st.eurDkk} onChange={num("eurDkk")} /></div>
+          {[["mainAccount", "Conto stipendio"], ["investAccount", "Conto investimenti"], ["extraAccount", "Conto Extra"], ["tradingAccount", "Conto trading"]].map(([k, l]) => (
+            <div className="detail-field-row" key={k}>
+              <label>{l}</label>
+              <select value={st[k]} onChange={acc(k)}>
+                {(accountNames.includes(st[k]) ? accountNames : [st[k], ...accountNames]).map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
