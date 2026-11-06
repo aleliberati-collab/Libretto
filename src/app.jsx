@@ -292,9 +292,9 @@ function sharedAccountNames(accounts) {
 function personalFlows(transactions, shared) {
   const out = [];
   transactions.forEach((t) => {
-    if (t.type === "in" && !shared.has(t.account)) out.push({ date: t.date, kind: "in", category: t.category, amount: t.amount });
-    else if (t.type === "out" && !shared.has(t.account)) out.push({ date: t.date, kind: "out", category: t.category, amount: t.amount });
-    else if (t.type === "transfer" && !shared.has(t.account) && shared.has(t.toAccount)) out.push({ date: t.date, kind: "out", category: "Quota casa", amount: t.amount });
+    if (t.type === "in" && !shared.has(t.account)) out.push({ date: t.date, kind: "in", category: t.category, amount: t.amount, note: t.note });
+    else if (t.type === "out" && !shared.has(t.account)) out.push({ date: t.date, kind: "out", category: t.category, amount: t.amount, note: t.note });
+    else if (t.type === "transfer" && !shared.has(t.account) && shared.has(t.toAccount)) out.push({ date: t.date, kind: "out", category: "Quota casa", amount: t.amount, note: "Quota casa" });
   });
   return out;
 }
@@ -465,6 +465,7 @@ const IconHome = (p) => <Icon {...p} path={<><path d="M3 10.5 12 3l9 7.5"/><path
 const IconLandmark = (p) => <Icon {...p} path={<><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></>} />;
 const IconChart = (p) => <Icon {...p} path={<><path d="M3 3v18h18"/><path d="M7 15l4-6 3 3 5-8"/></>} />;
 const IconX = (p) => <Icon {...p} path={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>} />;
+const IconSpark = (p) => <Icon {...p} path={<><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z"/></>} />;
 const IconTarget = (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>} />;
 const IconSwap = (p) => <Icon {...p} path={<><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></>} />;
 const IconList = (p) => <Icon {...p} path={<><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></>} />;
@@ -766,6 +767,138 @@ function Header({ title }) {
   );
 }
 
+// ---------- coach: piccoli consigli sulle spese, calcolati dai tuoi movimenti (mai sugli investimenti) ----------
+// Ogni consiglio confronta il mese in corso con i mesi passati alla stessa data, così l'inizio mese non sembra "troppo poco".
+// tone: "good" (va bene), "warn" (da guardare), "info" (curiosità utile). Più alto score = più in alto.
+const COACH_MIN_DAY = 5; // prima del giorno 5 i confronti del mese sono troppo rumorosi
+const normNote = (s) => (s || "").toLowerCase().replace(/[^a-zà-ù]+/g, " ").trim().slice(0, 22);
+
+function coachTips(state, today = new Date()) {
+  const shared = sharedAccountNames(state.accounts);
+  const flows = personalFlows(state.transactions, shared);
+  const outs = flows.filter((f) => f.kind === "out");
+  const monthKey = (d) => d.toISOString().slice(0, 7);
+  const curKey = monthKey(today);
+  const day = today.getDate();
+  // mesi completi presenti nei dati (al massimo gli ultimi 6)
+  const pastKeys = [...new Set(flows.map((f) => f.date.slice(0, 7)))].filter((k) => k < curKey).sort().slice(-6);
+  if (pastKeys.length === 0) {
+    return [{ id: "start", tone: "info", score: 0, text: <>Il coach si attiva dopo il primo <strong>mese completo</strong> di movimenti: da lì confronta ogni mese con le tue abitudini.</> }];
+  }
+  const tips = [];
+  const sumBy = (arr) => arr.reduce((a, f) => a + f.amount, 0);
+  const avgMonthlyOut = sumBy(outs.filter((f) => pastKeys.includes(f.date.slice(0, 7)))) / pastKeys.length;
+  const unit = (n) => <strong>{fmt(n)} DKK</strong>;
+
+  // 1. ritmo di spesa del mese, alla stessa data dei mesi passati
+  if (day >= COACH_MIN_DAY && avgMonthlyOut > 0) {
+    const byDay = (key) => sumBy(outs.filter((f) => f.date.slice(0, 7) === key && Number(f.date.slice(8, 10)) <= day));
+    const usual = pastKeys.reduce((a, k) => a + byDay(k), 0) / pastKeys.length;
+    const now = byDay(curKey);
+    const diff = now - usual;
+    const threshold = Math.max(avgMonthlyOut * 0.05, 1);
+    if (diff > threshold) {
+      tips.push({ id: "pace-up", tone: "warn", score: 90 + Math.min(diff / avgMonthlyOut, 1) * 10, text: <>Finora questo mese hai speso {unit(diff)} in più del solito alla stessa data.</> });
+    } else if (diff < -threshold) {
+      tips.push({ id: "pace-down", tone: "good", score: 60, text: <>Ottimo ritmo: finora hai speso {unit(-diff)} in meno del solito alla stessa data.</> });
+    }
+    // 2. la categoria che sta crescendo di più
+    const cats = [...new Set(outs.map((f) => f.category))];
+    let worst = null;
+    cats.forEach((c) => {
+      const catDay = (key) => sumBy(outs.filter((f) => f.category === c && f.date.slice(0, 7) === key && Number(f.date.slice(8, 10)) <= day));
+      const u = pastKeys.reduce((a, k) => a + catDay(k), 0) / pastKeys.length;
+      const n = catDay(curKey);
+      const d = n - u;
+      if (d > Math.max(avgMonthlyOut * 0.02, 1) && (u === 0 || d / u >= 0.25) && (!worst || d > worst.d)) worst = { c, d, u };
+    });
+    if (worst) {
+      tips.push({ id: "cat-" + worst.c, tone: "warn", score: 80, text: <>Su <strong>{worst.c}</strong> hai speso {unit(worst.d)} in più del solito a questo punto del mese{worst.u > 0 ? ` (+${Math.round((worst.d / worst.u) * 100)}%)` : ""}: vale la pena dare un'occhiata.</> });
+    }
+  }
+
+  // 3. abbonamenti: quanto pesano sulle uscite
+  const subs = sumBy(outs.filter((f) => /abbonament/i.test(f.category) && pastKeys.includes(f.date.slice(0, 7)))) / pastKeys.length;
+  if (subs > 0 && avgMonthlyOut > 0) {
+    const pct = (subs / avgMonthlyOut) * 100;
+    if (pct >= 3) tips.push({ id: "subs", tone: pct >= 8 ? "warn" : "info", score: 50 + pct, text: <>Gli abbonamenti ti costano {unit(subs)} al mese, il <strong>{pct.toFixed(0)}%</strong> delle uscite: li usi davvero tutti?</> });
+  }
+
+  // 4. spese che si ripetono ogni mese (stessa descrizione, importo simile)
+  const recentKeys = pastKeys.slice(-3);
+  if (recentKeys.length >= 2) {
+    const groups = {};
+    // affitto, spesa e quota casa si ripetono ma non sono "abbonamenti": restano fuori
+    const skip = /^(casa|spesa|trasferimento)$/i;
+    outs.filter((f) => recentKeys.includes(f.date.slice(0, 7)) && f.note && f.category !== "Quota casa" && !skip.test(f.category)).forEach((f) => {
+      const k = normNote(f.note);
+      if (k.length < 3) return;
+      (groups[k] = groups[k] || []).push(f);
+    });
+    const recurring = Object.values(groups).filter((g) => {
+      const months = new Set(g.map((f) => f.date.slice(0, 7)));
+      if (months.size < 2) return false;
+      const amts = g.map((f) => f.amount);
+      return Math.max(...amts) <= Math.min(...amts) * 1.05;
+    });
+    if (recurring.length >= 3) {
+      const tot = recurring.reduce((a, g) => a + sumBy(g) / new Set(g.map((f) => f.date.slice(0, 7))).size, 0);
+      tips.push({ id: "recurring", tone: "info", score: 45, text: <>Hai <strong>{recurring.length} spese</strong> che tornano ogni mese con lo stesso importo, per circa {unit(tot)} al mese: è il primo posto dove cercare un risparmio.</> });
+    }
+  }
+
+  // 5. tasso di risparmio del mese scorso rispetto alla tua media
+  const lastKey = pastKeys[pastKeys.length - 1];
+  const rateOf = (keys) => {
+    const inc = sumBy(flows.filter((f) => f.kind === "in" && keys.includes(f.date.slice(0, 7))));
+    const out = sumBy(outs.filter((f) => keys.includes(f.date.slice(0, 7))));
+    return inc > 0 ? ((inc - out) / inc) * 100 : null;
+  };
+  const lastRate = rateOf([lastKey]);
+  const avgRate = pastKeys.length >= 2 ? rateOf(pastKeys.slice(0, -1)) : null;
+  if (lastRate !== null && avgRate !== null && Math.abs(lastRate - avgRate) >= 3) {
+    const better = lastRate > avgRate;
+    tips.push({ id: "rate", tone: better ? "good" : "warn", score: better ? 55 : 70, text: <>Il mese scorso hai messo da parte il <strong>{lastRate.toFixed(0)}%</strong> delle entrate, {better ? "sopra" : "sotto"} la tua media del {avgRate.toFixed(0)}%.</> });
+  }
+
+  // 6. riserva di emergenza: mesi di spese coperti da conti e depositi
+  if (avgMonthlyOut > 0) {
+    const months = (totalAccountBalance(state.accounts) + totalDeposits(state.deposits)) / avgMonthlyOut;
+    if (months < 3) tips.push({ id: "runway", tone: "warn", score: 75, text: <>La tua liquidità copre <strong>{months.toFixed(1)} mesi</strong> di spese: una riserva di almeno 3 mesi ti protegge dagli imprevisti.</> });
+  }
+
+  // 7. viaggi: quanto costano in un anno e quanto mettere da parte ogni mese per coprirli
+  const yearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()).toISOString().slice(0, 10);
+  const trips = outs.filter((f) => /viagg|voli|volo|flight/i.test(f.category) && f.date >= yearAgo);
+  if (trips.length >= 2) {
+    const tot = sumBy(trips);
+    tips.push({ id: "trips", tone: "info", score: 30, text: <>Negli ultimi 12 mesi i viaggi ti sono costati {unit(tot)}: mettere da parte circa {unit(tot / 12)} al mese li copre senza sorprese.</> });
+  }
+
+  return tips.sort((a, b) => b.score - a.score);
+}
+
+function Coach({ state }) {
+  const [all, setAll] = useState(false);
+  const tips = coachTips(state);
+  if (!tips.length) return null;
+  const shown = all ? tips : tips.slice(0, 3);
+  return (
+    <section className="panel coach">
+      <div className="panel-title"><IconSpark size={16} /> Il coach del mese</div>
+      {shown.map((t) => (
+        <div key={t.id} className={"coach-tip " + t.tone}>
+          <span className="coach-icon" aria-hidden="true">{t.tone === "good" ? "✓" : t.tone === "warn" ? "!" : "i"}</span>
+          <span className="coach-text">{t.text}</span>
+        </div>
+      ))}
+      {tips.length > 3 && (
+        <button className="manage-cat-link" onClick={() => setAll((v) => !v)}>{all ? "Mostra meno" : tips.length - 3 === 1 ? "Un altro consiglio" : `Altri ${tips.length - 3} consigli`}</button>
+      )}
+    </section>
+  );
+}
+
 function Overview({ state }) {
   const { transactions, investments, accounts, deposits } = state;
   const now = new Date();
@@ -853,6 +986,8 @@ function Overview({ state }) {
           Investito {fmt(goal.inv)} · Depositi {fmt(goal.dep)} · Liquidità dedicata {fmt(goal.cash)}
         </div>
       </section>
+
+      <Coach state={state} />
 
       {nearNext && nextPhase && (
         <div className="alert-card">
