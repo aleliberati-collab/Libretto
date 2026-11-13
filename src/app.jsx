@@ -2,6 +2,17 @@
 const { useState, useEffect } = React;
 
 // ---------- constants ----------
+// icona per categoria: riconosce le parole più comuni, altrimenti l'iniziale
+const CAT_EMOJI = [
+  [/casa|affitto|mutuo/i, "🏠"], [/spesa|supermerc/i, "🛒"], [/cibo|ristor|pranz|cena|bar/i, "🍽️"], [/trasport|auto|benzina/i, "🚇"],
+  [/voli|volo|viagg|vacanz/i, "✈️"], [/svago|tempo libero|hobby/i, "🎬"], [/salute|medic|farmac/i, "💊"], [/utenz|bollett/i, "💡"],
+  [/shopping|vestit|abbigl/i, "🛍️"], [/abbonament/i, "🔁"], [/stipendio|salario/i, "💼"], [/bonus|premio/i, "🎁"],
+  [/rimborso/i, "↩️"], [/interess/i, "📈"], [/quota/i, "👥"], [/regal/i, "🎁"], [/sport|palestra/i, "🏋️"], [/figli|bambin|scuola/i, "🎒"], [/animal/i, "🐾"],
+];
+const catEmoji = (cat) => {
+  const f = CAT_EMOJI.find(([re]) => re.test(cat || ""));
+  return f ? f[1] : (cat || "?").slice(0, 1).toUpperCase();
+};
 const DEFAULT_CATEGORIES_OUT = ["Casa", "Cibo", "Trasporti", "Viaggi", "Svago", "Salute", "Altro", "Utenze", "Spesa", "Shopping", "Abbonamento"];
 const DEFAULT_CATEGORIES_IN = ["Stipendio", "RSU/Bonus", "Rimborso", "Altro", "Interessi"];
 const CAT_COLORS = {
@@ -653,7 +664,7 @@ function App() {
       </nav>
       <main className="content">
         {tab === "panoramica" && <BackupReminder lastBackupDate={state.lastBackupDate} hasData={state.transactions.length > 0} onExport={exportData} />}
-        {tab === "panoramica" && <Overview state={state} />}
+        {tab === "panoramica" && <Overview state={state} onGoTo={setTab} />}
         {tab === "piano" && (
           <MonthlyPlan state={state} accountNames={names} onUpdateSettings={updateSettings} onRegister={(txs) => addTransactions(txs, true)} />
         )}
@@ -899,7 +910,7 @@ function Coach({ state }) {
   );
 }
 
-function Overview({ state }) {
+function Overview({ state, onGoTo }) {
   const { transactions, investments, accounts, deposits } = state;
   const now = new Date();
   const monthKey = now.toISOString().slice(0, 7);
@@ -936,6 +947,12 @@ function Overview({ state }) {
   const cashTotal = totalAccountBalance(accounts);
   const depositsTotal = totalDeposits(deposits);
   const totalInvested = investments.reduce((a, i) => a + (i.value || 0), 0);
+  const monthScale = Math.max(income, expense, avgIncome || 0, avgExpense || 0, 1);
+  const whereRows = [
+    { key: "cash", label: "Conti", note: `${accounts.length} ${accounts.length === 1 ? "conto" : "conti"}, pronti da usare`, value: cashTotal, color: "#4A6FA5", tab: "conti" },
+    { key: "dep", label: "Depositi", note: deposits.length ? "soldi vincolati che rendono un interesse" : "nessun deposito", value: depositsTotal, color: "#CA8A04", tab: "conti" },
+    { key: "inv", label: "Investimenti", note: "Saxo, Revolut, azioni aziendali e crypto", value: totalInvested, color: "#0E9F8E", tab: "investimenti" },
+  ];
   const goal = goalCapitalOf(state);
   const goalCapital = goal.total;
   const GOAL_DKK = Number(state.settings.goal) || 0;
@@ -970,8 +987,8 @@ function Overview({ state }) {
             <div className="goal-value">{fmt(goalCapital)} <span className="unit">DKK</span></div>
             <div className="goal-target">su {fmt(GOAL_DKK)} DKK obiettivo</div>
           </div>
-          <div className="goal-plane">
-            <IconHome size={28} />
+          <div className="goal-pct">
+            <div className="goal-pct-n">{Math.floor(goalProgress)}<span>%</span></div>
             <div className="goal-countdown">Fase {phase.n}</div>
           </div>
         </div>
@@ -980,7 +997,7 @@ function Overview({ state }) {
           <div className="runway-marker" style={{ left: `${goalProgress}%` }} />
         </div>
         <div className="runway-caption">
-          {goalProgress.toFixed(1)}% · {phase.n < lastN ? `mancano ${fmt(toNext)} DKK alla soglia ${fmt(nextThreshold / 1000)}k` : goalCapital >= GOAL_DKK ? "obiettivo raggiunto" : `mancano ${fmt(toNext)} DKK all'obiettivo`}
+          {phase.n < lastN ? `Mancano ${fmt(toNext)} DKK alla soglia ${fmt(nextThreshold / 1000)}k` : goalCapital >= GOAL_DKK ? "Obiettivo raggiunto" : `Mancano ${fmt(toNext)} DKK all'obiettivo`}
         </div>
         <div className="goal-breakdown">
           Investito {fmt(goal.inv)} · Depositi {fmt(goal.dep)} · Liquidità dedicata {fmt(goal.cash)}
@@ -988,6 +1005,25 @@ function Overview({ state }) {
       </section>
 
       <Coach state={state} />
+
+      <section className="panel">
+        <div className="panel-title"><IconCalendar size={16} /> Questo mese</div>
+        <div className="month-net">
+          <div className="month-net-label">{net >= 0 ? "Finora ti restano" : "Finora hai speso più di quanto è entrato"}</div>
+          <div className={"month-net-value" + (net < 0 ? " neg" : "")}>{net < 0 ? "−" : ""}{fmt(Math.abs(net))} <span className="unit-sm">DKK</span></div>
+        </div>
+        {[["Entrate", income, avgIncome, "in"], ["Uscite", expense, avgExpense, "out"]].map(([label, val, avg, tone]) => (
+          <div className="month-row" key={label}>
+            <div className="month-row-top">
+              <span className="month-row-label">{label}</span>
+              <span className={"month-row-val " + tone}>{fmt(val)} DKK</span>
+            </div>
+            <div className="month-track"><div className={"month-fill " + tone} style={{ width: `${Math.min(100, (val / monthScale) * 100)}%` }} /></div>
+            {avg !== null && <div className="month-row-note">di solito {fmt(avg)} DKK in un mese intero</div>}
+          </div>
+        ))}
+      </section>
+
 
       {nearNext && nextPhase && (
         <div className="alert-card">
@@ -1046,74 +1082,29 @@ function Overview({ state }) {
         <NetWorthChart history={state.netWorthHistory || []} />
       </section>
 
-      <section className="grid-3">
-        <StatCard label="Entrate (mese)" value={income} tone="in" />
-        <StatCard label="Uscite (mese)" value={expense} tone="out" />
-        <StatCard label="Saldo netto (mese)" value={net} tone={net >= 0 ? "in" : "out"} />
-      </section>
-
-      {monthsCounted > 0 && (
-        <section className="panel">
-          <div className="panel-title"><IconChart size={16} /> Medie mensili <span className="panel-title-sub">({monthsCounted} {monthsCounted === 1 ? "mese" : "mesi"} completi)</span></div>
-          <div className="grid-3 no-margin">
-            <StatCard label="Media entrate" value={avgIncome} tone="in" />
-            <StatCard label="Media uscite" value={avgExpense} tone="out" />
-            <StatCard label="Media saldo" value={avgIncome - avgExpense} tone={avgIncome - avgExpense >= 0 ? "in" : "out"} />
-          </div>
-          {avgIncome > 0 && (
-            <div className="kpi-cell" style={{ marginTop: "10px", borderBottom: "none", paddingBottom: 0 }}>
-              <div className="kpi-label">Tasso di risparmio medio</div>
-              <div className="kpi-value">{(((avgIncome - avgExpense) / avgIncome) * 100).toFixed(1)}%</div>
-            </div>
-          )}
-        </section>
-      )}
-
-      <section className="grid-2">
-        <div className="panel">
-          <div className="panel-title"><IconWallet size={16} /> Conti correnti</div>
-          {accounts.map((a) => (
-            <div key={a.id}>
-              <div className="account-row">
-                <span className="account-name">{a.name}{a.goal ? " 🏠" : ""}</span>
-                <span className={"account-bal" + (a.balance < 0 ? " negative" : "")}>{fmt(a.balance)} DKK</span>
-              </div>
-              {(a.subaccounts || []).map((sub) => (
-                <div className="account-row sub" key={sub.id}>
-                  <span className="account-name">↳ {sub.name}{sub.goal ? " 🏠" : ""}</span>
-                  <span className={"account-bal" + (sub.balance < 0 ? " negative" : "")}>{fmt(sub.balance)} DKK</span>
-                </div>
-              ))}
-            </div>
-          ))}
-          <div className="account-row total"><span className="account-name">Totale liquidità</span><span className="account-bal">{fmt(cashTotal)} DKK</span></div>
-        </div>
-
-        <div className="panel">
-          <div className="panel-title"><IconLandmark size={16} /> Conti deposito</div>
-          {deposits.length === 0 && <div className="empty-note">Nessun conto deposito.</div>}
-          {deposits.map((d) => (
-            <div className="account-row" key={d.id}>
-              <span className="account-name">{d.name}{d.goal ? " 🏠" : ""}{d.rate ? <span className="rate-tag">{d.rate}%</span> : null}</span>
-              <span className="account-bal">{fmt(d.balance)} DKK</span>
-            </div>
-          ))}
-          <div className="account-row total"><span className="account-name">Totale depositi</span><span className="account-bal">{fmt(depositsTotal)} DKK</span></div>
-        </div>
-      </section>
-
       <section className="panel">
-        <div className="panel-title"><IconPiggy size={16} /> Investimenti</div>
-        {investments.map((i) => (
-          <div className="account-row" key={i.id}><span className="account-name">{i.label}{GOAL_BUCKETS.includes(i.bucket) ? " 🏠" : ""}</span><span className="account-bal">{fmt(i.value)} DKK</span></div>
+        <div className="panel-title"><IconWallet size={16} /> Dove sono i tuoi soldi</div>
+        {netWorthTotal > 0 && (
+          <div className="where-bar" role="img" aria-label="Ripartizione del patrimonio">
+            {whereRows.map((w) => w.value > 0 ? <span key={w.key} style={{ width: `${(w.value / netWorthTotal) * 100}%`, background: w.color }} /> : null)}
+          </div>
+        )}
+        {whereRows.map((w) => (
+          <button className="where-row" key={w.key} onClick={() => onGoTo(w.tab)}>
+            <span className="where-dot" style={{ background: w.color }} />
+            <span className="where-text">
+              <span className="where-label">{w.label}</span>
+              <span className="where-note">{w.note}</span>
+            </span>
+            <span className="where-val">{fmt(w.value)} <span className="unit-sm">DKK</span></span>
+            <span className="where-chev" aria-hidden="true">›</span>
+          </button>
         ))}
-        <div className="account-row total"><span className="account-name">Totale investito</span><span className="account-bal">{fmt(totalInvested)} DKK</span></div>
-        <div className="kpi-note" style={{ marginTop: 6 }}>🏠 = conta per il Fondo Casa</div>
       </section>
 
       {shared.size > 0 && (
         <section className="panel">
-          <div className="panel-title"><IconHome size={16} /> Conto di casa (mese corrente)</div>
+          <div className="panel-title"><IconHome size={16} /> Conto di casa <span className="panel-title-sub">questo mese</span></div>
           <div className="account-row"><span className="account-name">Spese di casa</span><span className="account-bal">{fmt(houseSpent)} DKK</span></div>
           <div className="account-row"><span className="account-name">Tua quota versata</span><span className="account-bal">{fmt(quotaMonth)} DKK</span></div>
           <div className="kpi-note" style={{ marginTop: 6 }}>Le spese del cointestato sono della coppia: nelle tue statistiche entra solo la quota che versi.</div>
@@ -1121,7 +1112,7 @@ function Overview({ state }) {
       )}
 
       <section className="panel">
-        <div className="panel-title"><IconTrend size={16} /> Le tue uscite per categoria (mese corrente)</div>
+        <div className="panel-title"><IconTrend size={16} /> Uscite per categoria <span className="panel-title-sub">questo mese</span></div>
         {catEntries.length === 0 && <div className="empty-note">Nessuna uscita registrata questo mese.</div>}
         {catEntries.map(([cat, val]) => (
           <div className="cat-row" key={cat}>
@@ -1414,8 +1405,8 @@ function NetWorthChart({ history }) {
         {hp && <circle cx={hx} cy={yAt(hp.value)} r="4.5" className="nw-dot" />}
       </svg>
       {hp && (
-        <div className="chart-tooltip" style={{ left: `${Math.min(80, Math.max(20, (hx / W) * 100))}%`, top: 0 }}>
-          {hp.date}: {fmt(hp.value)} DKK
+        <div className="chart-readout">
+          <strong>{fmt(hp.value)} DKK</strong> · {new Date(hp.date + "T12:00:00").toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" })}
         </div>
       )}
     </div>
@@ -1537,7 +1528,7 @@ function Accounts({ accounts, deposits, onToggleAccountShared, onToggleSubShared
 
   return (
     <div className="accounts-page">
-      <div className="kpi-note" style={{ marginBottom: 10 }}>🏠 attivo = il saldo conta per il Fondo Casa (attivalo sui conti e depositi dedicati). 👥 attivo = conto di casa condiviso: le sue spese restano fuori dalle tue statistiche e conta solo la quota che versi.</div>
+      <div className="kpi-note" style={{ marginBottom: 10 }}>Tocca un saldo per correggerlo. 🏠 = conta per il Fondo Casa. 👥 = conto di casa condiviso.</div>
       <div className="panel">
         <div className="panel-title"><IconWallet size={16} /> Conti correnti</div>
         {accounts.map((a) => (
@@ -1725,7 +1716,7 @@ function Movements({ state, transactions, accountNames, categoriesOut, categorie
             {items.map((t) => (
               <div className="tx-row clickable" key={t.id} onClick={() => setSelectedId(t.id)}>
                 <span className="tx-icon" style={{ "--cat": t.type === "transfer" ? "var(--muted)" : catColor(t.category) }} aria-hidden="true">
-                  {t.type === "transfer" ? "⇄" : (t.category || "?").slice(0, 1).toUpperCase()}
+                  {t.type === "transfer" ? "⇄" : catEmoji(t.category)}
                 </span>
                 <div className="tx-main">
                   <div className="tx-title">{t.note || t.category}</div>
@@ -1734,11 +1725,7 @@ function Movements({ state, transactions, accountNames, categoriesOut, categorie
                   </div>
                 </div>
                 <div className={"tx-amount " + t.type}>{t.type === "in" ? "+" : t.type === "out" ? "−" : ""}{fmt(t.amount)}</div>
-                <button
-                  className="tx-delete"
-                  onClick={(e) => { e.stopPropagation(); onDelete(t.id); }}
-                  aria-label="Elimina"
-                ><IconTrash size={15} /></button>
+                <span className="tx-chev" aria-hidden="true">›</span>
               </div>
             ))}
           </section>

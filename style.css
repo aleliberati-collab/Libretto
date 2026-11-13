@@ -28,17 +28,17 @@
   --neg-soft: rgba(210, 54, 74, 0.10);
   --warn: #A9630A;
   --warn-soft: rgba(224, 146, 32, 0.13);
-  --hero-bg: #0E1217;
+  --hero-bg: linear-gradient(140deg, #2F5BEA 0%, #1F3DAA 100%);
   --hero-fg: #FFFFFF;
-  --hero-muted: rgba(255, 255, 255, 0.62);
-  --hero-track: rgba(255, 255, 255, 0.14);
+  --hero-muted: rgba(255, 255, 255, 0.86);
+  --hero-track: rgba(255, 255, 255, 0.24);
   --shadow: 0 1px 2px rgba(14, 18, 23, 0.04), 0 6px 18px rgba(14, 18, 23, 0.05);
   --scrim: rgba(8, 10, 14, 0.45);
   --font: "Manrope", system-ui, -apple-system, Roboto, "Segoe UI", sans-serif;
   --r-lg: 20px;
   --r-md: 14px;
   --r-sm: 10px;
-  --tabbar-h: 64px;
+  --tabbar-h: 68px;
   color-scheme: light;
 }
 
@@ -61,10 +61,10 @@
     --neg-soft: rgba(255, 107, 122, 0.12);
     --warn: #F2B04C;
     --warn-soft: rgba(242, 176, 76, 0.13);
-    --hero-bg: #1A1F27;
-    --hero-fg: #F4F6F9;
-    --hero-muted: rgba(244, 246, 249, 0.6);
-    --hero-track: rgba(255, 255, 255, 0.10);
+    --hero-bg: linear-gradient(140deg, #2A4FD0 0%, #182F86 100%);
+    --hero-fg: #FFFFFF;
+    --hero-muted: rgba(255, 255, 255, 0.84);
+    --hero-track: rgba(255, 255, 255, 0.20);
     --shadow: none;
     --scrim: rgba(0, 0, 0, 0.6);
     color-scheme: dark;
@@ -518,3 +518,156 @@ input[type=number] { -moz-appearance: textfield; }
 .coach-tip.warn .coach-icon { background: rgba(194, 65, 12, 0.14); color: #C2410C; }
 .coach-tip.info .coach-icon { background: var(--accent-soft); color: var(--accent); }
 @media (prefers-color-scheme: dark) { .coach-tip.warn .coach-icon { color: #FB923C; } }
+
+/* ===== v3: più leggibile (come in Altrove), con il blu del Libretto ===== */
+/* testi: niente etichette minuscole in maiuscolo, corpi più grandi */
+.header { padding-bottom: 8px; }
+.header-meta { font-size: 13px; }
+.header-title { font-size: 30px; margin-top: 8px; }
+.content { padding-top: 12px; }
+.panel { padding: 18px; margin-bottom: 14px; }
+.panel-title { font-size: 17px; margin-bottom: 14px; letter-spacing: -0.015em; }
+.panel-title svg { color: var(--accent); }
+.panel-title-sub { font-size: 12px; }
+.panel-subtitle, .chip-caption, .filter-label, .invest-group-name, .deposit-field label, .detail-field-row label, .stat-label, .kpi-label, .tx-day-head {
+  text-transform: none; letter-spacing: 0;
+}
+.panel-subtitle { font-size: 14px; color: var(--fg); margin-top: 18px; }
+.filter-label, .chip-caption { font-size: 13px; font-weight: 700; }
+.kpi-note, .eur-hint { font-size: 12.5px; line-height: 1.5; }
+.empty-note { font-size: 14px; }
+.account-row { font-size: 15px; padding: 12px 0; }
+.account-row.sub { font-size: 14px; }
+.detail-field-row { padding: 13px 2px; }
+.detail-field-row label { font-size: 14px; font-weight: 600; color: var(--fg-2); }
+.unit-sm { font-size: 12.5px; }
+
+/* pulsanti e chip nel colore d'accento */
+.btn-add { background: var(--accent); color: var(--on-accent); font-size: 15px; padding: 14px; border-radius: 16px; }
+.chip { font-size: 13.5px; padding: 8px 14px; }
+.chip.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.backup-reminder button, .update-bar button { background: var(--accent); color: var(--on-accent); }
+.backup-btn { font-size: 13.5px; padding: 13px 6px; }
+.manage-cat-link { font-size: 14px; }
+.quick-add-typebtn { font-size: 14px; padding: 10px 4px; }
+
+/* barra in basso: scheda attiva in una pillola */
+.tabbar { padding-top: 8px; }
+.tabbar-btn { font-size: 11px; gap: 4px; color: var(--muted); }
+.tabbar-btn svg { box-sizing: content-box; padding: 4px 14px; border-radius: 999px; }
+.tabbar-btn.active { color: var(--accent); }
+.tabbar-btn.active svg { background: var(--accent-soft); }
+
+/* carta obiettivo: terracotta, percentuale grande */
+.goal-card, .invest-total-card { background: var(--hero-bg); border-radius: 26px; padding: 22px 20px; margin-bottom: 14px; box-shadow: 0 12px 28px -12px rgba(31, 61, 170, 0.55); }
+.eyebrow { font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 700; margin-bottom: 8px; }
+.goal-value { font-size: 44px; }
+.unit { font-size: 16px; }
+.goal-target { font-size: 13.5px; line-height: 1.45; }
+.goal-pct { flex-shrink: 0; text-align: center; background: var(--hero-track); border-radius: 18px; padding: 10px 12px 8px; }
+.goal-pct-n { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.goal-pct-n span { font-size: 15px; font-weight: 700; margin-left: 1px; }
+.goal-countdown { margin-top: 4px; font-size: 11px; }
+.runway { height: 10px; margin-top: 20px; }
+.runway-fill { background: #FFFFFF; }
+.runway-caption { font-size: 14px; margin-top: 12px; }
+.goal-breakdown { font-size: 12.5px; }
+.goal-cta { color: #1F3DAA; background: #FFFFFF; }
+.alloc-bar { height: 10px; }
+.alloc-bar span { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+.alloc-legend { font-size: 13px; }
+.alloc-legend i { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5); }
+
+/* avvisi in alto */
+.demo-banner { align-items: center; padding: 8px 8px 8px 14px; font-size: 13.5px; margin-bottom: 14px; flex-wrap: nowrap; }
+.install-hint, .backup-reminder { font-size: 13.5px; }
+
+/* questo mese */
+.month-net { margin-bottom: 14px; }
+.month-net-label { font-size: 13.5px; font-weight: 600; color: var(--muted); }
+.month-net-value { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; color: var(--pos); margin-top: 2px; }
+.month-net-value.neg { color: var(--neg); }
+.month-row { padding: 10px 0 2px; }
+.month-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.month-row-label { font-size: 15px; font-weight: 700; color: var(--fg); }
+.month-row-val { font-size: 16px; font-weight: 800; white-space: nowrap; }
+.month-row-val.in { color: var(--pos); }
+.month-track { height: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin: 7px 0 5px; }
+.month-fill { height: 100%; border-radius: 999px; }
+.month-fill.in { background: var(--pos); }
+.month-fill.out { background: var(--accent); }
+.month-row-note { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+
+/* indicatori */
+.kpi-grid { gap: 10px; }
+.kpi-cell { padding: 14px; border-radius: var(--r-md); }
+.kpi-label { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.kpi-value { font-size: 24px; }
+.stat-label { font-size: 13px; font-weight: 600; }
+
+/* dove sono i tuoi soldi */
+.where-bar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; gap: 2px; margin-bottom: 8px; background: var(--surface-2); }
+.where-bar span { display: block; height: 100%; }
+.where-row { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 13px 0; cursor: pointer; text-align: left; }
+.where-row:last-child { border-bottom: 0; padding-bottom: 2px; }
+.where-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.where-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.where-label { font-size: 15.5px; font-weight: 700; color: var(--fg); }
+.where-note { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-top: 1px; }
+.where-val { font-size: 16px; font-weight: 800; color: var(--fg); white-space: nowrap; }
+.where-chev, .tx-chev { color: var(--faint); font-size: 20px; line-height: 1; }
+
+/* coach */
+.coach-tip { font-size: 14.5px; padding: 12px 0; gap: 12px; }
+.coach-icon { width: 26px; height: 26px; font-size: 13px; }
+
+/* categorie */
+.cat-row { padding: 9px 0; }
+.cat-label { font-size: 14px; width: 116px; }
+.cat-dot { width: 10px; height: 10px; }
+.cat-bar-track { height: 10px; }
+.cat-val { font-size: 14px; width: 62px; }
+
+/* movimenti */
+.tx-day { padding: 6px 16px; }
+.tx-day-head { font-size: 13px; padding-top: 12px; }
+.tx-row { grid-template-columns: 42px minmax(0, 1fr) auto 12px; padding: 11px 0; }
+.tx-icon { width: 42px; height: 42px; border-radius: 14px; font-size: 19px; }
+.tx-title { font-size: 15.5px; }
+.tx-sub { font-size: 13px; }
+.tx-amount { font-size: 16px; }
+
+/* conti: nome a sinistra, saldo a destra */
+.account-block-header { gap: 8px; padding: 6px 0; }
+.account-block-name { order: 1; font-size: 15.5px; }
+.account-block-header.sub .account-block-name { font-size: 14.5px; }
+.account-block-header .goal-toggle { order: 2; }
+.account-block-header .balance-input { order: 3; width: 104px; font-size: 16px; }
+.account-block-header .tx-delete { order: 4; }
+.account-block-header .dkk-tag { display: none; }
+.goal-toggle { font-size: 14px; padding: 5px 6px; border-radius: 10px; }
+.sub-add-row input { font-size: 14.5px; }
+.invest-label { font-size: 15px; }
+.invest-group-name { font-size: 14px; color: var(--fg); }
+.invest-group-sub { font-size: 14px; }
+.invest-list .invest-row { padding: 6px 0; }
+
+/* piano */
+.plan-field span { font-size: 14.5px; }
+.plan-slice-note, .plan-step-sub { font-size: 13px; }
+.step-n { width: 28px; height: 28px; }
+
+/* benvenuto */
+.onb-title { font-size: 32px; letter-spacing: -0.03em; }
+.onb-lead { font-size: 16.5px; }
+.onb-step { text-transform: none; letter-spacing: 0; font-size: 14px; }
+.chart-readout { font-size: 13.5px; color: var(--muted); font-weight: 600; margin-top: 8px; }
+.chart-readout strong { color: var(--fg); font-weight: 800; font-size: 15px; }
+/* conti: il nome va a capo invece di essere troncato */
+.account-block-name { white-space: normal; overflow: visible; line-height: 1.25; }
+.account-block-header .balance-input { width: 92px; }
+.account-block-header .tx-delete { width: 24px; }
+.account-block-header .balance-input { width: 84px; }
+.account-block-header.sub { padding-left: 6px; }
+.account-block-header.sub .account-block-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-block-header .goal-toggle { padding: 4px 5px; }
