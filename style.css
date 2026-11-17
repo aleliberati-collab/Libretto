@@ -671,3 +671,15 @@ input[type=number] { -moz-appearance: textfield; }
 .account-block-header.sub { padding-left: 6px; }
 .account-block-header.sub .account-block-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .account-block-header .goal-toggle { padding: 4px 5px; }
+
+/* coach: consigli cliccabili che portano alla sezione */
+button.coach-tip { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); text-align: left; font: inherit; color: var(--fg-2); cursor: default; }
+button.coach-tip:last-of-type { border-bottom: 0; }
+button.coach-tip:disabled { opacity: 1; }
+button.coach-tip.clickable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button.coach-tip.clickable:active { background: var(--accent-soft); }
+.coach-text { flex: 1; }
+.coach-go { color: var(--accent); font-size: 22px; font-weight: 700; line-height: 1; align-self: center; padding-left: 4px; }
+.coach-focus { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; margin: 4px 0 12px; border-radius: 14px; background: var(--accent-soft); color: var(--fg); font-size: 14px; scroll-margin-top: 80px; }
+.coach-focus-eyebrow { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+.coach-focus button { flex-shrink: 0; border: 1px solid var(--accent); background: none; color: var(--accent); font: inherit; font-weight: 700; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer; }

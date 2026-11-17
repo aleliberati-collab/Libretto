@@ -1,5 +1,5 @@
 
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 // ---------- constants ----------
 // icona per categoria: riconosce le parole più comuni, altrimenti l'iniziale
@@ -303,9 +303,9 @@ function sharedAccountNames(accounts) {
 function personalFlows(transactions, shared) {
   const out = [];
   transactions.forEach((t) => {
-    if (t.type === "in" && !shared.has(t.account)) out.push({ date: t.date, kind: "in", category: t.category, amount: t.amount, note: t.note });
-    else if (t.type === "out" && !shared.has(t.account)) out.push({ date: t.date, kind: "out", category: t.category, amount: t.amount, note: t.note });
-    else if (t.type === "transfer" && !shared.has(t.account) && shared.has(t.toAccount)) out.push({ date: t.date, kind: "out", category: "Quota casa", amount: t.amount, note: "Quota casa" });
+    if (t.type === "in" && !shared.has(t.account)) out.push({ id: t.id, date: t.date, kind: "in", category: t.category, amount: t.amount, note: t.note });
+    else if (t.type === "out" && !shared.has(t.account)) out.push({ id: t.id, date: t.date, kind: "out", category: t.category, amount: t.amount, note: t.note });
+    else if (t.type === "transfer" && !shared.has(t.account) && shared.has(t.toAccount)) out.push({ id: t.id, date: t.date, kind: "out", category: "Quota casa", amount: t.amount, note: "Quota casa" });
   });
   return out;
 }
@@ -489,6 +489,14 @@ function App() {
   const [state, setState] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState("panoramica");
+  // dove portare l'utente quando tocca un consiglio del coach (filtri da applicare all'arrivo)
+  const [focus, setFocus] = useState(null);
+  const goTo = (target) => {
+    const t = typeof target === "string" ? { tab: target } : target;
+    setFocus(t.ids || t.month ? t : null);
+    setTab(t.tab);
+    window.scrollTo(0, 0);
+  };
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   useEffect(() => {
@@ -656,7 +664,7 @@ function App() {
       <Header title={(NAV.find((n) => n[0] === tab) || NAV[0])[2]} />
       <nav className="tabbar" aria-label="Sezioni">
         {NAV.map(([key, label, , NavIcon]) => (
-          <button key={key} className={"tabbar-btn" + (tab === key ? " active" : "")} aria-current={tab === key ? "page" : undefined} onClick={() => { setTab(key); window.scrollTo(0, 0); }}>
+          <button key={key} className={"tabbar-btn" + (tab === key ? " active" : "")} aria-current={tab === key ? "page" : undefined} onClick={() => { setFocus(null); setTab(key); window.scrollTo(0, 0); }}>
             <NavIcon size={22} />
             <span>{label}</span>
           </button>
@@ -664,7 +672,7 @@ function App() {
       </nav>
       <main className="content">
         {tab === "panoramica" && <BackupReminder lastBackupDate={state.lastBackupDate} hasData={state.transactions.length > 0} onExport={exportData} />}
-        {tab === "panoramica" && <Overview state={state} onGoTo={setTab} />}
+        {tab === "panoramica" && <Overview state={state} onGoTo={goTo} />}
         {tab === "piano" && (
           <MonthlyPlan state={state} accountNames={names} onUpdateSettings={updateSettings} onRegister={(txs) => addTransactions(txs, true)} />
         )}
@@ -689,6 +697,7 @@ function App() {
         )}
         {tab === "movimenti" && (
           <Movements
+            focus={focus}
             state={state}
             transactions={state.transactions}
             accountNames={names}
@@ -705,7 +714,7 @@ function App() {
           />
         )}
         {tab === "categorie" && (
-          <CategoryAnalysis transactions={state.transactions} accounts={state.accounts} />
+          <CategoryAnalysis transactions={state.transactions} accounts={state.accounts} focus={focus} />
         )}
         {tab === "investimenti" && (
           <Investments investments={state.investments} onUpdate={updateInvestment} onAdd={addInvestment} onDelete={deleteInvestment} />
@@ -794,7 +803,7 @@ function coachTips(state, today = new Date()) {
   // mesi completi presenti nei dati (al massimo gli ultimi 6)
   const pastKeys = [...new Set(flows.map((f) => f.date.slice(0, 7)))].filter((k) => k < curKey).sort().slice(-6);
   if (pastKeys.length === 0) {
-    return [{ id: "start", tone: "info", score: 0, text: <>Il coach si attiva dopo il primo <strong>mese completo</strong> di movimenti: da lì confronta ogni mese con le tue abitudini.</> }];
+    return [{ id: "start", tone: "info", score: 0, go: { tab: "movimenti" }, text: <>Il coach si attiva dopo il primo <strong>mese completo</strong> di movimenti: da lì confronta ogni mese con le tue abitudini.</> }];
   }
   const tips = [];
   const sumBy = (arr) => arr.reduce((a, f) => a + f.amount, 0);
@@ -809,9 +818,9 @@ function coachTips(state, today = new Date()) {
     const diff = now - usual;
     const threshold = Math.max(avgMonthlyOut * 0.05, 1);
     if (diff > threshold) {
-      tips.push({ id: "pace-up", tone: "warn", score: 90 + Math.min(diff / avgMonthlyOut, 1) * 10, text: <>Finora questo mese hai speso {unit(diff)} in più del solito alla stessa data.</> });
+      tips.push({ id: "pace-up", tone: "warn", go: { tab: "categorie", month: curKey }, score: 90 + Math.min(diff / avgMonthlyOut, 1) * 10, text: <>Finora questo mese hai speso {unit(diff)} in più del solito alla stessa data.</> });
     } else if (diff < -threshold) {
-      tips.push({ id: "pace-down", tone: "good", score: 60, text: <>Ottimo ritmo: finora hai speso {unit(-diff)} in meno del solito alla stessa data.</> });
+      tips.push({ id: "pace-down", tone: "good", go: { tab: "categorie", month: curKey }, score: 60, text: <>Ottimo ritmo: finora hai speso {unit(-diff)} in meno del solito alla stessa data.</> });
     }
     // 2. la categoria che sta crescendo di più
     const cats = [...new Set(outs.map((f) => f.category))];
@@ -824,7 +833,8 @@ function coachTips(state, today = new Date()) {
       if (d > Math.max(avgMonthlyOut * 0.02, 1) && (u === 0 || d / u >= 0.25) && (!worst || d > worst.d)) worst = { c, d, u };
     });
     if (worst) {
-      tips.push({ id: "cat-" + worst.c, tone: "warn", score: 80, text: <>Su <strong>{worst.c}</strong> hai speso {unit(worst.d)} in più del solito a questo punto del mese{worst.u > 0 ? ` (+${Math.round((worst.d / worst.u) * 100)}%)` : ""}: vale la pena dare un'occhiata.</> });
+      const catIds = outs.filter((f) => f.category === worst.c && f.date.slice(0, 7) === curKey).map((f) => f.id);
+      tips.push({ id: "cat-" + worst.c, tone: "warn", go: { tab: "movimenti", ids: catIds, label: `${worst.c}, questo mese` }, score: 80, text: <>Su <strong>{worst.c}</strong> hai speso {unit(worst.d)} in più del solito a questo punto del mese{worst.u > 0 ? ` (+${Math.round((worst.d / worst.u) * 100)}%)` : ""}: vale la pena dare un'occhiata.</> });
     }
   }
 
@@ -832,7 +842,8 @@ function coachTips(state, today = new Date()) {
   const subs = sumBy(outs.filter((f) => /abbonament/i.test(f.category) && pastKeys.includes(f.date.slice(0, 7)))) / pastKeys.length;
   if (subs > 0 && avgMonthlyOut > 0) {
     const pct = (subs / avgMonthlyOut) * 100;
-    if (pct >= 3) tips.push({ id: "subs", tone: pct >= 8 ? "warn" : "info", score: 50 + pct, text: <>Gli abbonamenti ti costano {unit(subs)} al mese, il <strong>{pct.toFixed(0)}%</strong> delle uscite: li usi davvero tutti?</> });
+    const subIds = outs.filter((f) => /abbonament/i.test(f.category) && (pastKeys.includes(f.date.slice(0, 7)) || f.date.slice(0, 7) === curKey)).map((f) => f.id);
+    if (pct >= 3) tips.push({ id: "subs", tone: pct >= 8 ? "warn" : "info", go: { tab: "movimenti", ids: subIds, label: "Abbonamenti" }, score: 50 + pct, text: <>Gli abbonamenti ti costano {unit(subs)} al mese, il <strong>{pct.toFixed(0)}%</strong> delle uscite: li usi davvero tutti?</> });
   }
 
   // 4. spese che si ripetono ogni mese (stessa descrizione, importo simile)
@@ -854,7 +865,8 @@ function coachTips(state, today = new Date()) {
     });
     if (recurring.length >= 3) {
       const tot = recurring.reduce((a, g) => a + sumBy(g) / new Set(g.map((f) => f.date.slice(0, 7))).size, 0);
-      tips.push({ id: "recurring", tone: "info", score: 45, text: <>Hai <strong>{recurring.length} spese</strong> che tornano ogni mese con lo stesso importo, per circa {unit(tot)} al mese: è il primo posto dove cercare un risparmio.</> });
+      const recIds = recurring.flatMap((g) => g.map((f) => f.id));
+      tips.push({ id: "recurring", tone: "info", go: { tab: "movimenti", ids: recIds, label: "Spese che tornano ogni mese" }, score: 45, text: <>Hai <strong>{recurring.length} spese</strong> che tornano ogni mese con lo stesso importo, per circa {unit(tot)} al mese: è il primo posto dove cercare un risparmio.</> });
     }
   }
 
@@ -869,13 +881,13 @@ function coachTips(state, today = new Date()) {
   const avgRate = pastKeys.length >= 2 ? rateOf(pastKeys.slice(0, -1)) : null;
   if (lastRate !== null && avgRate !== null && Math.abs(lastRate - avgRate) >= 3) {
     const better = lastRate > avgRate;
-    tips.push({ id: "rate", tone: better ? "good" : "warn", score: better ? 55 : 70, text: <>Il mese scorso hai messo da parte il <strong>{lastRate.toFixed(0)}%</strong> delle entrate, {better ? "sopra" : "sotto"} la tua media del {avgRate.toFixed(0)}%.</> });
+    tips.push({ id: "rate", tone: better ? "good" : "warn", go: { tab: "categorie", month: lastKey }, score: better ? 55 : 70, text: <>Il mese scorso hai messo da parte il <strong>{lastRate.toFixed(0)}%</strong> delle entrate, {better ? "sopra" : "sotto"} la tua media del {avgRate.toFixed(0)}%.</> });
   }
 
   // 6. riserva di emergenza: mesi di spese coperti da conti e depositi
   if (avgMonthlyOut > 0) {
     const months = (totalAccountBalance(state.accounts) + totalDeposits(state.deposits)) / avgMonthlyOut;
-    if (months < 3) tips.push({ id: "runway", tone: "warn", score: 75, text: <>La tua liquidità copre <strong>{months.toFixed(1)} mesi</strong> di spese: una riserva di almeno 3 mesi ti protegge dagli imprevisti.</> });
+    if (months < 3) tips.push({ id: "runway", tone: "warn", go: { tab: "conti" }, score: 75, text: <>La tua liquidità copre <strong>{months.toFixed(1)} mesi</strong> di spese: una riserva di almeno 3 mesi ti protegge dagli imprevisti.</> });
   }
 
   // 7. viaggi: quanto costano in un anno e quanto mettere da parte ogni mese per coprirli
@@ -883,13 +895,13 @@ function coachTips(state, today = new Date()) {
   const trips = outs.filter((f) => /viagg|voli|volo|flight/i.test(f.category) && f.date >= yearAgo);
   if (trips.length >= 2) {
     const tot = sumBy(trips);
-    tips.push({ id: "trips", tone: "info", score: 30, text: <>Negli ultimi 12 mesi i viaggi ti sono costati {unit(tot)}: mettere da parte circa {unit(tot / 12)} al mese li copre senza sorprese.</> });
+    tips.push({ id: "trips", tone: "info", go: { tab: "movimenti", ids: trips.map((f) => f.id), label: "Viaggi, ultimi 12 mesi" }, score: 30, text: <>Negli ultimi 12 mesi i viaggi ti sono costati {unit(tot)}: mettere da parte circa {unit(tot / 12)} al mese li copre senza sorprese.</> });
   }
 
   return tips.sort((a, b) => b.score - a.score);
 }
 
-function Coach({ state }) {
+function Coach({ state, onGo }) {
   const [all, setAll] = useState(false);
   const tips = coachTips(state);
   if (!tips.length) return null;
@@ -898,10 +910,11 @@ function Coach({ state }) {
     <section className="panel coach">
       <div className="panel-title"><IconSpark size={16} /> Il coach del mese</div>
       {shown.map((t) => (
-        <div key={t.id} className={"coach-tip " + t.tone}>
+        <button type="button" key={t.id} className={"coach-tip " + t.tone + (t.go ? " clickable" : "")} disabled={!t.go} onClick={() => t.go && onGo(t.go)}>
           <span className="coach-icon" aria-hidden="true">{t.tone === "good" ? "✓" : t.tone === "warn" ? "!" : "i"}</span>
           <span className="coach-text">{t.text}</span>
-        </div>
+          {t.go && <span className="coach-go" aria-hidden="true">›</span>}
+        </button>
       ))}
       {tips.length > 3 && (
         <button className="manage-cat-link" onClick={() => setAll((v) => !v)}>{all ? "Mostra meno" : tips.length - 3 === 1 ? "Un altro consiglio" : `Altri ${tips.length - 3} consigli`}</button>
@@ -1004,7 +1017,7 @@ function Overview({ state, onGoTo }) {
         </div>
       </section>
 
-      <Coach state={state} />
+      <Coach state={state} onGo={onGoTo} />
 
       <section className="panel">
         <div className="panel-title"><IconCalendar size={16} /> Questo mese</div>
@@ -1595,12 +1608,15 @@ function Accounts({ accounts, deposits, onToggleAccountShared, onToggleSubShared
   );
 }
 
-function Movements({ state, transactions, accountNames, categoriesOut, categoriesIn, onAdd, onImport, onAddRules, onDeleteRule, onDelete, onUpdate, onAddCategory, onDeleteCategory }) {
+function Movements({ focus, state, transactions, accountNames, categoriesOut, categoriesIn, onAdd, onImport, onAddRules, onDeleteRule, onDelete, onUpdate, onAddCategory, onDeleteCategory }) {
   const accounts = accountNames.length ? accountNames : ["Revolut", "Lunar"];
   const [form, setForm] = useState({ date: todayISO(), account: accounts[0], toAccount: accounts[1] || accounts[0], type: "out", category: categoriesOut[0], amount: "", note: "" });
   const [filterAccount, setFilterAccount] = useState("Tutti");
   const [filterCategory, setFilterCategory] = useState("Tutte");
   const [filterMonth, setFilterMonth] = useState("Tutti");
+  const [coachFilter, setCoachFilter] = useState(focus && focus.ids ? { label: focus.label, ids: new Set(focus.ids) } : null);
+  const coachRef = useRef(null);
+  useEffect(() => { if (coachFilter && coachRef.current) coachRef.current.scrollIntoView({ block: "start" }); }, []);
   const [selectedId, setSelectedId] = useState(null);
   const [manageCatOpen, setManageCatOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -1634,7 +1650,8 @@ function Movements({ state, transactions, accountNames, categoriesOut, categorie
   const filtered = transactions.filter((t) =>
     (filterAccount === "Tutti" || t.account === filterAccount || t.toAccount === filterAccount) &&
     (filterCategory === "Tutte" || t.category === filterCategory) &&
-    (filterMonth === "Tutti" || t.date.slice(0, 7) === filterMonth)
+    (filterMonth === "Tutti" || t.date.slice(0, 7) === filterMonth) &&
+    (!coachFilter || coachFilter.ids.has(t.id))
   );
   const selectedTx = transactions.find((t) => t.id === selectedId) || null;
 
@@ -1672,6 +1689,13 @@ function Movements({ state, transactions, accountNames, categoriesOut, categorie
         <button type="submit" className="btn-add"><IconPlus size={16} /> Aggiungi movimento</button>
       </form>
       </details>
+
+      {coachFilter && (
+        <div className="coach-focus" ref={coachRef}>
+          <span><span className="coach-focus-eyebrow">Dal coach</span><strong>{coachFilter.label}</strong> · {filtered.length === 1 ? "1 movimento" : `${filtered.length} movimenti`}</span>
+          <button onClick={() => setCoachFilter(null)}>Mostra tutti</button>
+        </div>
+      )}
 
       <div className="filter-row">
         <span className="filter-label">Conto:</span>
@@ -2180,10 +2204,10 @@ function ManageCategories({ categoriesOut, categoriesIn, rules, onAddCategory, o
   );
 }
 
-function CategoryAnalysis({ transactions, accounts }) {
+function CategoryAnalysis({ transactions, accounts, focus }) {
   const [type, setType] = useState("out");
   const [scope, setScope] = useState("personal");
-  const [selectedMonth, setSelectedMonth] = useState("media");
+  const [selectedMonth, setSelectedMonth] = useState(focus && focus.month ? focus.month : "media");
 
   const shared = sharedAccountNames(accounts);
   const filteredByType = type === "out" && scope === "casa"
